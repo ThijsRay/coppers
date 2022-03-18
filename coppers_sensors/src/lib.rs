@@ -20,6 +20,8 @@ use std::time::{Duration, Instant};
 
 // Trait for all kind of sensors to implement
 pub trait Sensor {
+    // Retrieve name of the sensor
+    fn get_name(&self) -> String;
     // Start position to measure the power consumption and timer
     fn start_measuring(&mut self);
     // Stop position to measure the power consumption and timer
@@ -35,6 +37,7 @@ pub trait Sensor {
 #[derive(Debug)]
 pub struct RAPLSensor {
     location: String,
+    name: String,
     // Timer values
     timer_start_position: Option<Instant>,
     timer_end_position: Option<Instant>,
@@ -46,7 +49,11 @@ pub struct RAPLSensor {
 
 // Sensor trait implementation for RAPLSensor
 impl Sensor for RAPLSensor {
-    fn start_measuring(&mut self) {
+    fn get_name(&self) -> String {
+        return self.name.to_string();
+    }
+
+    fn start_measuring(&mut self){
         let measuring_location = self.location.to_string() + "/energy_uj";
         // Access rights and enabling is checked at initialization of sensor so unwrap is allowed
         let current_measured_uj = read_to_string(measuring_location).unwrap();
@@ -114,13 +121,18 @@ impl RAPLSensor {
         if measured_energy.is_err() {
             return Err(format!("Insufficient permissions to read from {measuring_location}. You might want to retry as root."));
         }
+        // Retrieve the name of the sensor
+        let name_location = location.to_string() + "/name";
+        let mut name = read_to_string(name_location).unwrap();
+        name.pop(); // remove trailing breakline
         // Retrieve the max range value of the sensor
         let max_range_location = location.to_string() + "/max_energy_range_uj";
         let max_range_string = read_to_string(max_range_location).unwrap();
         let max_range = RAPLSensor::convert_read_string_to_u128(max_range_string);
 
         Ok(RAPLSensor {
-            location,
+            location: location,
+            name: name,
             timer_start_position: None,
             timer_end_position: None,
             energy_start_position: 0,
