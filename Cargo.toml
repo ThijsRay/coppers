@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 regex = "1"
+nvml-wrapper = "0.7.0"

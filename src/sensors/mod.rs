@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use std::result::Result;
 use std::option::Option;
 use regex::Regex;
+pub mod nvml_sensor;
 
 // Trait for all kind of sensors to implement
 pub trait Sensor {
