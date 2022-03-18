@@ -10,6 +10,6 @@ fn main() {
     sensor.start_measuring();
     sleep(Duration::new(2,0));
     sensor.stop_measuring();
-    println!("measured {}uJ", sensor.get_measured_uj());
+    println!("{} measured {}uJ", sensor.get_name(), sensor.get_measured_uj());
     println!("Hello, world!");
 }
