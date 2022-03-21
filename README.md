@@ -1,6 +1,23 @@
 # Coppers
 
-Coppers is a test harnass for Rust with the intention of determining the evolution of power consumptions of a program between different versions. In order to determine the power consumption of a program coppers replaces the existing testing harness in Rust and runs each test written by the developer of a Rust program to approximate the power consumption of a program.
+Coppers is a test harness for Rust with the intention of determining the evolution of power consumptions of a program between different versions. In order to determine the power consumption of a program coppers replaces the existing testing harness in Rust and runs each test written by the developer of a Rust program to approximate the power consumption of a program.
+
+## Requirements
+This test harness targets the Rust nightly toolchain because it relies on unstable features of the Rust compiler.
+* First, make sure that you have installed the nightly toolchain with `rustup install nightly`
+* Then, enable the nightly toolchain on this repository with `rustup override set nightly`
+
+## Usage 
+To enable the custom test runner in your project, add this to your `Cargo.toml` file.
+```toml
+[dev-dependencies]
+coppers = { git = "https://github.com/ThijsRay/coppers" }
+```
+Add the following two lines at the top of your crate root (most likely `lib.rs` or `main.rs`)
+```rust
+#![feature(custom_test_frameworks)]
+#![test_runner(coppers::runner)]
+```
 
 ## How to run Coppers
 
