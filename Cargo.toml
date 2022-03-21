@@ -7,7 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/ThijsRay/coppers"
 
 [lib]
-name = "coppers_test_runner"
+name = "coppers"
 path = "coppers_test_runner/lib.rs"
 
 [workspace]
