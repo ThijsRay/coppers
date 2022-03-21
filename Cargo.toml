@@ -6,7 +6,13 @@ description = "Coppers is a custom test harnass that measures the energy usage o
 license = "Apache-2.0"
 repository = "https://github.com/ThijsRay/coppers"
 
+[lib]
+name = "coppers"
+path = "coppers_test_runner/lib.rs"
+
+[workspace]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1"
+coppers_sensors = { path = "coppers_sensors"}
