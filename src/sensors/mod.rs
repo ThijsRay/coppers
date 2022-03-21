@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fs::read_to_string;
-use std::time::{Duration, Instant};
-use std::result::Result;
-use std::option::Option;
 use regex::Regex;
+use std::fs::read_to_string;
+use std::option::Option;
+use std::result::Result;
+use std::time::{Duration, Instant};
 
 // Trait for all kind of sensors to implement
 pub trait Sensor {
@@ -45,7 +45,7 @@ pub struct RAPLSensor {
 
 // Sensor trait implementation for RAPLSensor
 impl Sensor for RAPLSensor {
-    fn start_measuring(&mut self){
+    fn start_measuring(&mut self) {
         let measuring_location = self.location.to_string() + "/energy_uj";
         // Access rights and enabling is checked at initialization of sensor so unwrap is allowed
         let current_measured_uj = read_to_string(measuring_location).unwrap();
@@ -54,7 +54,7 @@ impl Sensor for RAPLSensor {
         self.timer_start_position = Some(Instant::now());
     }
 
-    fn stop_measuring(&mut self){
+    fn stop_measuring(&mut self) {
         let measuring_location = self.location.to_string() + "/energy_uj";
         let current_measured_uj = read_to_string(measuring_location).unwrap();
         self.energy_end_position = RAPLSensor::convert_read_string_to_u128(current_measured_uj);
@@ -62,7 +62,7 @@ impl Sensor for RAPLSensor {
         self.timer_end_position = Some(Instant::now());
     }
 
-    fn get_measured_uj(&self) -> u128{
+    fn get_measured_uj(&self) -> u128 {
         if self.energy_end_position < self.energy_start_position {
             return (self.energy_max_range - self.energy_start_position) + self.energy_end_position;
         } else {
@@ -172,7 +172,9 @@ mod tests {
 
     #[test]
     fn raplsensor_convert_read_string_to_u128_large() {
-        let result = RAPLSensor::convert_read_string_to_u128(String::from("12345678901234567890123456789\n"));
+        let result = RAPLSensor::convert_read_string_to_u128(String::from(
+            "12345678901234567890123456789\n",
+        ));
         assert_eq!(result, 12345678901234567890123456789);
     }
 }
