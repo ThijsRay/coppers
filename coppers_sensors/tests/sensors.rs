@@ -1,4 +1,4 @@
-// Copyright 2022 Jeffrey Bouman
+// Copyright 2022 Thijs Raymakers, Jeffrey Bouman
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod sensors;
-use sensors::{RAPLSensor, Sensor};
+use coppers_sensors::*;
 use std::thread::sleep;
 use std::time::Duration;
 
-fn main() {
+#[test]
+fn test_rapl_sensor() {
     let mut sensor = RAPLSensor::new(String::from(
         "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0",
     ))
@@ -26,5 +26,4 @@ fn main() {
     sleep(Duration::new(2, 0));
     sensor.stop_measuring();
     println!("measured {}uJ", sensor.get_measured_uj());
-    println!("Hello, world!");
 }
