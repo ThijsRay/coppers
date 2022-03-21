@@ -2,6 +2,9 @@
 name = "coppers"
 version = "0.0.1"
 edition = "2021"
+description = "Coppers is a custom test harnass that measures the energy usage of your test suite."
+license = "Apache-2.0"
+repository = "https://github.com/ThijsRay/coppers"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
