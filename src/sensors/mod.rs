@@ -64,9 +64,9 @@ impl Sensor for RAPLSensor {
 
     fn get_measured_uj(&self) -> u128 {
         if self.energy_end_position < self.energy_start_position {
-            return (self.energy_max_range - self.energy_start_position) + self.energy_end_position;
+            (self.energy_max_range - self.energy_start_position) + self.energy_end_position
         } else {
-            return self.energy_end_position - self.energy_start_position;
+            self.energy_end_position - self.energy_start_position
         }
     }
 
@@ -78,7 +78,7 @@ impl Sensor for RAPLSensor {
         // Now unwrappable due to above check
         let start = self.timer_start_position.unwrap();
         let end = self.timer_end_position.unwrap();
-        return end.duration_since(start).as_micros();
+        end.duration_since(start).as_micros()
     }
 
     fn get_duration(&self) -> Duration {
@@ -89,7 +89,7 @@ impl Sensor for RAPLSensor {
         // Now unwrappable due to above check
         let start = self.timer_start_position.unwrap();
         let end = self.timer_end_position.unwrap();
-        return end.saturating_duration_since(start);
+        end.saturating_duration_since(start)
     }
 }
 
@@ -119,7 +119,7 @@ impl RAPLSensor {
         let max_range = RAPLSensor::convert_read_string_to_u128(max_range_string);
 
         Ok(RAPLSensor {
-            location: location,
+            location,
             timer_start_position: None,
             timer_end_position: None,
             energy_start_position: 0,
@@ -138,7 +138,7 @@ impl RAPLSensor {
         }
         let captures = re.captures(input_string.as_str()).unwrap();
         let value: u128 = captures.get(1).map_or(0, |m| m.as_str().parse().unwrap());
-        return value;
+        value
     }
 }
 
