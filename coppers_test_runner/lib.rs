@@ -1,6 +1,18 @@
-#![feature(custom_test_frameworks)]
+// Copyright 2022 Thijs Raymakers
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #![feature(test)]
-#![test_runner(crate::runner)]
 
 // Normally, we can use `use` to import a crate. However, the `test` crate is shipped
 // with Rust itself and thus it needs to be imported with `extern crate` because it is
@@ -12,4 +24,4 @@ extern crate test;
 mod test_runner;
 
 // Export the runner funcion so crates that depend on this crate can use it
-pub use crate::test_runner::runner as runner;
+pub use crate::test_runner::runner;
