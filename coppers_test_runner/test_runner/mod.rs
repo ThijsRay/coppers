@@ -32,6 +32,9 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     let mut passed_tests = Vec::new();
     let mut failed_tests = Vec::new();
 
+    let mut test_uj = 0;
+    let mut test_us = 0;
+
     let mut sensor =
         RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string())
             .unwrap();
@@ -41,7 +44,11 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
         let result = run_test(test);
         print_test_result(&result);
         match result.state {
-            TestResult::Passed => passed_tests.push(result),
+            TestResult::Passed => {
+                test_uj += result.uj.unwrap();
+                test_us += result.us.unwrap();
+                passed_tests.push(result);
+            },
             TestResult::Failed(_) => failed_tests.push(result),
             TestResult::Ignored => ignored += 1,
             //TestResult::Filtered => filtered += 1,
@@ -49,12 +56,15 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     }
 
     sensor.stop_measuring();
-    let elapsed = sensor.get_elapsed_time_us();
-    let uj = sensor.get_measured_uj();
+    let total_us = sensor.get_elapsed_time_us();
+    let total_uj = sensor.get_measured_uj();
+
+    let overhead_us = total_us - test_us;
+    let overhead_uj = total_uj - test_uj;
 
     print_failures(&failed_tests).unwrap();
 
-    println!("test result: {}. {} passed; {} failed; {ignored} ignored; finished in {elapsed} μs consuming {uj} μJ", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
+    println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
