@@ -21,6 +21,8 @@ use std::panic::catch_unwind;
 use std::sync::{Arc, Mutex};
 use test::{StaticTestFn, TestDescAndFn};
 
+const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
+
 pub fn runner(tests: &[&test::TestDescAndFn]) {
     let tests: Vec<_> = tests.iter().map(make_owned_test).collect();
 
@@ -175,7 +177,7 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
             test::TestFn::StaticTestFn(f) => {
                 let mut state = TestResult::Ignored;
                 // Run the test function 100 times in a row
-                for _ in 0..100 {
+                for _ in 0..REPEAT_TESTS_AMOUNT_OF_TIMES {
                     sensor.start_measuring();
                     let result = catch_unwind(f);
                     sensor.stop_measuring();
