@@ -13,6 +13,12 @@ fn test_ignored_test() {
 }
 
 #[test]
+#[should_panic(expected = "assertion failed")]
+fn test_should_panic_with_expected_message() {
+    assert_eq!(1 + 1, 3);
+}
+
+#[test]
 #[should_panic]
 fn test_should_panic() {
     assert_eq!(1 + 1, 3);

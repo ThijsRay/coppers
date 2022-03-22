@@ -42,38 +42,62 @@ fn run_test(test: &test::TestDescAndFn) -> Result<(), ()> {
             _ => unimplemented!("Only StaticTestFns are supported right now"),
         };
 
-        if test_succeeded(&test.desc, result) {
-            println!("[ok]");
-            Ok(())
-        } else {
-            println!("[err]");
-            Err(())
+        match test_result(&test.desc, result) {
+            Ok(_) => {
+                println!("[ok]");
+                Ok(())
+            }
+            Err(None) => {
+                println!("[failed]");
+                Err(())
+            }
+            Err(Some(msg)) => {
+                println!("[failed] with message: {}", msg);
+                Err(())
+            }
         }
     }
 }
 
-fn test_succeeded(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -> bool {
-    use test::ShouldPanic::{No, Yes, YesWithMessage};
+type TestResult = Result<(), Option<String>>;
 
-    match desc.should_panic {
-        No => result.is_ok(),
-        Yes => result.is_err(),
-        YesWithMessage(msg) => {
-            if let Err(err) = result {
-                if let Some(s) = err.downcast_ref::<&str>() {
-                    return msg.eq(*s);
-                }
-                if let Some(s) = err.downcast_ref::<String>() {
-                    return msg.eq(s);
-                }
+fn test_result(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -> TestResult {
+    use test::ShouldPanic;
+
+    let result = match (desc.should_panic, result) {
+        (ShouldPanic::No, Ok(())) | (ShouldPanic::Yes, Err(_)) => Ok(()),
+        (ShouldPanic::YesWithMessage(msg), Err(ref err)) => {
+            let maybe_panic_str = err
+                .downcast_ref::<String>()
+                .map(|e| &**e)
+                .or_else(|| err.downcast_ref::<&'static str>().copied());
+
+            if maybe_panic_str.map(|e| e.contains(msg)).unwrap_or(false) {
+                Ok(())
+            } else if let Some(panic_str) = maybe_panic_str {
+                Err(Some(format!(
+                    r#"panic did not contain expected string
+      panic message: `{:?}`,
+ expected substring: `{:?}`"#,
+                    panic_str, msg
+                )))
+            } else {
+                Err(Some(format!(
+                    r#"expected panic with string value,
+ found non-string value: `{:?}`
+     expected substring: `{:?}`"#,
+                    (**err).type_id(),
+                    msg
+                )))
             }
-            // Test failed because:
-            // - It didn't panic when it should
-            // - It did panic, but not with any message
-            // - It did panic, but not with the correct message
-            false
         }
-    }
+        (ShouldPanic::Yes, Ok(())) | (ShouldPanic::YesWithMessage(_), Ok(())) => {
+            Err(Some("test did not panic as expected".to_string()))
+        }
+        _ => Err(None)
+    };
+
+    result
 }
 
 #[cfg(test)]
@@ -105,14 +129,18 @@ mod tests {
     fn test_succeeded_succeeds_without_panic() {
         let desc = default_test_desc();
         let result = Ok(());
-        assert_eq!(test_succeeded(&desc, result), true)
+        assert_eq!(test_result(&desc, result), Ok(()))
     }
 
     #[test]
     fn test_succeeded_unexpected_panic() {
         let desc = default_test_desc();
-        let result = Err(generate_panic_info("Assertion failed"));
-        assert_eq!(test_succeeded(&desc, result), false)
+        let panic_str = "Assertion failed";
+        let result = Err(generate_panic_info(panic_str));
+        let test_result = test_result(&desc, result);
+        if Err(None) != test_result {
+            panic!("Result was {:?}", test_result)
+        }
     }
 
     #[test]
@@ -120,7 +148,8 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::Yes;
         let result = Err(generate_panic_info("Assertion failed"));
-        assert_eq!(test_succeeded(&desc, result), true)
+        let test_result = test_result(&desc, result);
+        assert_eq!(test_result, Ok(()))
     }
 
     #[test]
@@ -128,7 +157,11 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::Yes;
         let result = Ok(());
-        assert_eq!(test_succeeded(&desc, result), false)
+        let test_result = test_result(&desc, result);
+        match test_result {
+            Err(Some(msg)) => assert!(msg.contains("test did not panic")),
+            _ => panic!("Result was {:?}", test_result)
+        }
     }
 
     #[test]
@@ -136,7 +169,7 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info("This is a message"));
-        assert_eq!(test_succeeded(&desc, result), true)
+        assert_eq!(test_result(&desc, result), Ok(()))
     }
 
     #[test]
@@ -147,7 +180,22 @@ mod tests {
             panic::panic_any(String::from("This is a message"));
         })
         .unwrap_err());
-        assert_eq!(test_succeeded(&desc, result), true)
+        assert_eq!(test_result(&desc, result), Ok(()))
+    }
+
+    #[test]
+    fn test_succeeded_expected_panic_with_string_message_but_got_no_string() {
+        let mut desc = default_test_desc();
+        desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
+        let result = Err(catch_unwind(|| {
+            panic::panic_any(123);
+        })
+        .unwrap_err());
+        let test_result = test_result(&desc, result);
+        match test_result {
+            Err(Some(msg)) => assert!(msg.contains("expected panic with string value")),
+            _ => panic!("Result is {:?}", test_result)
+        }
     }
 
     #[test]
@@ -155,7 +203,12 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info("This is another message"));
-        assert_eq!(test_succeeded(&desc, result), false)
+        let test_result = test_result(&desc, result);
+        match test_result {
+            Err(Some(msg)) => assert!(msg.contains("panic did not contain expected string")),
+            _ => panic!("Result is {:?}", test_result)
+        }
+        
     }
 
     #[test]
@@ -163,7 +216,11 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info(""));
-        assert_eq!(test_succeeded(&desc, result), false)
+        let test_result = test_result(&desc, result);
+        match test_result {
+            Err(Some(msg)) => assert!(msg.contains("panic did not contain expected string")),
+            _ => panic!("Result is {:?}", test_result)
+        }
     }
 
     #[test]
@@ -171,6 +228,10 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Ok(());
-        assert_eq!(test_succeeded(&desc, result), false)
+        let test_result = test_result(&desc, result);
+        match test_result {
+            Err(Some(msg)) => assert!(msg.contains("test did not panic as expected")),
+            _ => panic!("Result is {:?}", test_result)
+        }
     }
 }
