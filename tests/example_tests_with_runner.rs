@@ -7,6 +7,11 @@ fn test_succesful_test() {
 }
 
 #[test]
+fn test_unsuccesful_test() {
+    assert_eq!(1 + 1, 3);
+}
+
+#[test]
 #[ignore]
 fn test_ignored_test() {
     assert_eq!(5 * 10, 5)

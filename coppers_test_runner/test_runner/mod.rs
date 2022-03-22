@@ -48,28 +48,56 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
         //println!("{}", result.sensor.unwrap().get_measured_uj())
     }
 
-    //    failures:
-    //
-    //---- test_runner::tests::test_succeeded_expected_panic_but_did_not_panic stdout ----
-    //thread 'test_runner::tests::test_succeeded_expected_panic_but_did_not_panic' panicked at 'assertion failed: msg.contains(\"test didnot panic\")', coppers_test_runner/test_runner/mod.rs:224:46
-    //note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-    //
-    //
-    //failures:
-    //    test_runner::tests::test_succeeded_expected_panic_but_did_not_panic
-
     let elapsed = now.elapsed();
     let seconds = elapsed.as_secs();
     let millis = elapsed.subsec_millis();
+
+    print_failures(&failed_tests).unwrap();
 
     let total = passed_tests.len() + failed_tests.len();
     println!("test result: {}. {} passed; {} failed; {ignored} ignored; {filtered} filtered out; finished in {seconds}.{millis}s", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
 }
 
+fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
+    if !tests.is_empty() {
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        for test in tests {
+            if let Some(captured) = &test.stdout {
+                handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.desc.name))?;
+                handle.write_all(&captured)?;
+                handle.write(b"\n")?;
+            }
+        }
+        handle.write(b"\nfailures:\n")?;
+        for test in tests {
+            handle.write_fmt(format_args!("\t{}", test.desc.name))?;
+            if let TestResult::Failed(Some(msg)) = &test.state {
+                handle.write_fmt(format_args!(": {}\n", msg));
+            }
+        }
+        handle.write(b"\n")?;
+    }
+    Ok(())
+}
+
 fn print_test_result(test: &CompletedTest) {
     match test.state {
-        TestResult::Passed => println!("test {} ... {}", test.desc.name, passed(true)),
-        TestResult::Failed(_) => println!("test {} ... {}", test.desc.name, passed(false)),
+        TestResult::Passed => {
+            let sensor = test.sensor.as_ref().unwrap();
+            let uj = (*sensor).get_measured_uj();
+            let us = (*sensor).get_elapsed_time_us();
+            println!("test {} ... {} - [{uj} μJ in {us} μs]", test.desc.name, passed(true))
+        },
+        TestResult::Failed(_) => {
+            if let Some(sensor) = &test.sensor {
+                let uj = (*sensor).get_measured_uj();
+                let us = (*sensor).get_elapsed_time_us();
+                println!("test {} ... {} - [{uj} μJ in {us} μs]", test.desc.name, passed(false))
+            } else {
+                println!("test {} ... {}", test.desc.name, passed(false))
+            }
+        },
         _ => {}
     }
 }
