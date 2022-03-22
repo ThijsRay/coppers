@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![feature(test)]
+#![feature(internal_output_capture)]
 
 // Normally, we can use `use` to import a crate. However, the `test` crate is shipped
 // with Rust itself and thus it needs to be imported with `extern crate` because it is

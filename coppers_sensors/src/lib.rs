@@ -32,6 +32,7 @@ pub trait Sensor {
     fn get_duration(&self) -> Duration;
 }
 
+#[derive(Debug)]
 pub struct RAPLSensor {
     location: String,
     // Timer values

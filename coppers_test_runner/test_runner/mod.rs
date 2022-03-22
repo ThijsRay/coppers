@@ -12,60 +12,168 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Note that this is heavily inspired by libtest that is part of the Rust language.
+
+use coppers_sensors::{RAPLSensor, Sensor};
 use std::any::Any;
-use std::panic::catch_unwind;
+use std::io::{self, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+use test::{StaticTestFn, TestDescAndFn};
 
 pub fn runner(tests: &[&test::TestDescAndFn]) {
+    let tests: Vec<_> = tests.iter().map(make_owned_test).collect();
+
     println!("Running {} tests", tests.len());
 
+    let mut ignored = 0;
+    let mut filtered = 0;
+
+    let now = Instant::now();
+
+    let mut passed_tests = Vec::new();
+    let mut failed_tests = Vec::new();
+
     for test in tests {
-        // TODO: properly handle failing tests instead of unwrapping
-        run_test(test).unwrap();
+        let result = run_test(test);
+        print_test_result(&result);
+        match result.state {
+            TestResult::Passed => passed_tests.push(result),
+            TestResult::Failed(_) => failed_tests.push(result),
+            TestResult::Ignored => ignored += 1,
+            TestResult::Filtered => filtered += 1,
+        }
+
+        //println!("{}", result.sensor.unwrap().get_measured_uj())
+    }
+
+    //    failures:
+    //
+    //---- test_runner::tests::test_succeeded_expected_panic_but_did_not_panic stdout ----
+    //thread 'test_runner::tests::test_succeeded_expected_panic_but_did_not_panic' panicked at 'assertion failed: msg.contains(\"test didnot panic\")', coppers_test_runner/test_runner/mod.rs:224:46
+    //note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    //
+    //
+    //failures:
+    //    test_runner::tests::test_succeeded_expected_panic_but_did_not_panic
+
+    let elapsed = now.elapsed();
+    let seconds = elapsed.as_secs();
+    let millis = elapsed.subsec_millis();
+
+    let total = passed_tests.len() + failed_tests.len();
+    println!("test result: {}. {} passed; {} failed; {ignored} ignored; {filtered} filtered out; finished in {seconds}.{millis}s", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
+}
+
+fn print_test_result(test: &CompletedTest) {
+    match test.state {
+        TestResult::Passed => println!("test {} ... {}", test.desc.name, passed(true)),
+        TestResult::Failed(_) => println!("test {} ... {}", test.desc.name, passed(false)),
+        _ => {}
     }
 }
 
-fn run_test(test: &test::TestDescAndFn) -> Result<(), ()> {
-    // If a test is marked with #[ignore], it should not be executed
-    if test.desc.ignore {
-        Ok(())
+fn passed(condition: bool) -> &'static str {
+    if condition {
+        "ok"
     } else {
-        print!("test {}...", test.desc.name);
+        "FAILED"
+    }
+}
 
-        let result = match test.testfn {
-            test::TestFn::StaticTestFn(f) => {
-                catch_unwind(|| {
-                    // TODO: Start energy measurement
-                    f()
-                    // TODO: Stop energy measurement
-                })
-            }
-            _ => unimplemented!("Only StaticTestFns are supported right now"),
-        };
+fn make_owned_test(test: &&TestDescAndFn) -> TestDescAndFn {
+    match test.testfn {
+        StaticTestFn(f) => TestDescAndFn {
+            testfn: StaticTestFn(f),
+            desc: test.desc.clone(),
+        },
+        _ => panic!("non-static tests passed to test::test_main_static"),
+    }
+}
 
-        match test_result(&test.desc, result) {
-            Ok(_) => {
-                println!("[ok]");
-                Ok(())
-            }
-            Err(None) => {
-                println!("[failed]");
-                Err(())
-            }
-            Err(Some(msg)) => {
-                println!("[failed] with message: {}", msg);
-                Err(())
-            }
+#[derive(Debug, PartialEq)]
+enum TestResult {
+    Passed,
+    Failed(Option<String>),
+    Ignored,
+    Filtered,
+}
+
+struct CompletedTest {
+    desc: test::TestDesc,
+    state: TestResult,
+    sensor: Option<Box<dyn Sensor>>,
+    stdout: Option<Vec<u8>>,
+}
+
+impl CompletedTest {
+    fn empty(desc: test::TestDesc) -> Self {
+        CompletedTest {
+            desc,
+            state: TestResult::Ignored,
+            sensor: None,
+            stdout: None,
         }
     }
 }
 
-type TestResult = Result<(), Option<String>>;
+fn run_test(test: test::TestDescAndFn) -> CompletedTest {
+    // If a test is marked with #[ignore], it should not be executed
+    if test.desc.ignore {
+        CompletedTest::empty(test.desc)
+    } else {
+        let sensor =
+            RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string());
 
-fn test_result(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -> TestResult {
+        // If the sensor could not be properly created, mark the test as failed.
+        if sensor.is_err() {
+            return sensor
+                .map_err(|err| CompletedTest {
+                    state: TestResult::Failed(Some(err.to_string())),
+                    ..CompletedTest::empty(test.desc)
+                })
+                .unwrap_err();
+        }
+        let mut sensor = sensor.unwrap();
+
+        // Use internal compiler function `set_output_capture` to capture the output of the
+        // tests.
+        let data = Arc::new(Mutex::new(Vec::new()));
+        io::set_output_capture(Some(data.clone()));
+
+        let result = match test.testfn {
+            test::TestFn::StaticTestFn(f) => catch_unwind(AssertUnwindSafe(|| {
+                sensor.start_measuring();
+                // Run the test function 100 times in a row
+                for _ in 0..100 {
+                    f();
+                }
+                sensor.stop_measuring();
+            })),
+            _ => unimplemented!("Only StaticTestFns are supported right now"),
+        };
+
+        // Reset the output capturing to the default behavior and transform the captured output
+        // to a vector of bytes.
+        io::set_output_capture(None);
+        let stdout = Some(data.lock().unwrap_or_else(|e| e.into_inner()).to_vec());
+
+        let state = test_state(&test.desc, result);
+        CompletedTest {
+            desc: test.desc,
+            state,
+            sensor: Some(Box::new(sensor)),
+            stdout,
+        }
+    }
+}
+
+fn test_state(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -> TestResult {
     use test::ShouldPanic;
 
     let result = match (desc.should_panic, result) {
-        (ShouldPanic::No, Ok(())) | (ShouldPanic::Yes, Err(_)) => Ok(()),
+        (ShouldPanic::No, Ok(())) | (ShouldPanic::Yes, Err(_)) => TestResult::Passed,
         (ShouldPanic::YesWithMessage(msg), Err(ref err)) => {
             let maybe_panic_str = err
                 .downcast_ref::<String>()
@@ -73,16 +181,16 @@ fn test_result(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -
                 .or_else(|| err.downcast_ref::<&'static str>().copied());
 
             if maybe_panic_str.map(|e| e.contains(msg)).unwrap_or(false) {
-                Ok(())
+                TestResult::Passed
             } else if let Some(panic_str) = maybe_panic_str {
-                Err(Some(format!(
+                TestResult::Failed(Some(format!(
                     r#"panic did not contain expected string
       panic message: `{:?}`,
  expected substring: `{:?}`"#,
                     panic_str, msg
                 )))
             } else {
-                Err(Some(format!(
+                TestResult::Failed(Some(format!(
                     r#"expected panic with string value,
  found non-string value: `{:?}`
      expected substring: `{:?}`"#,
@@ -92,9 +200,9 @@ fn test_result(desc: &test::TestDesc, result: Result<(), Box<dyn Any + Send>>) -
             }
         }
         (ShouldPanic::Yes, Ok(())) | (ShouldPanic::YesWithMessage(_), Ok(())) => {
-            Err(Some("test did not panic as expected".to_string()))
+            TestResult::Failed(Some("test did not panic as expected".to_string()))
         }
-        _ => Err(None)
+        _ => TestResult::Failed(None),
     };
 
     result
@@ -129,7 +237,7 @@ mod tests {
     fn test_succeeded_succeeds_without_panic() {
         let desc = default_test_desc();
         let result = Ok(());
-        assert_eq!(test_result(&desc, result), Ok(()))
+        assert_eq!(test_state(&desc, result), TestResult::Passed)
     }
 
     #[test]
@@ -137,8 +245,8 @@ mod tests {
         let desc = default_test_desc();
         let panic_str = "Assertion failed";
         let result = Err(generate_panic_info(panic_str));
-        let test_result = test_result(&desc, result);
-        if Err(None) != test_result {
+        let test_result = test_state(&desc, result);
+        if TestResult::Failed(None) != test_result {
             panic!("Result was {:?}", test_result)
         }
     }
@@ -148,8 +256,8 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::Yes;
         let result = Err(generate_panic_info("Assertion failed"));
-        let test_result = test_result(&desc, result);
-        assert_eq!(test_result, Ok(()))
+        let test_result = test_state(&desc, result);
+        assert_eq!(test_result, TestResult::Passed)
     }
 
     #[test]
@@ -157,10 +265,10 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::Yes;
         let result = Ok(());
-        let test_result = test_result(&desc, result);
+        let test_result = test_state(&desc, result);
         match test_result {
-            Err(Some(msg)) => assert!(msg.contains("test did not panic")),
-            _ => panic!("Result was {:?}", test_result)
+            TestResult::Failed(Some(msg)) => assert!(msg.contains("test did not panic")),
+            _ => panic!("Result was {:?}", test_result),
         }
     }
 
@@ -169,7 +277,7 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info("This is a message"));
-        assert_eq!(test_result(&desc, result), Ok(()))
+        assert_eq!(test_state(&desc, result), TestResult::Passed)
     }
 
     #[test]
@@ -180,7 +288,7 @@ mod tests {
             panic::panic_any(String::from("This is a message"));
         })
         .unwrap_err());
-        assert_eq!(test_result(&desc, result), Ok(()))
+        assert_eq!(test_state(&desc, result), TestResult::Passed)
     }
 
     #[test]
@@ -191,10 +299,12 @@ mod tests {
             panic::panic_any(123);
         })
         .unwrap_err());
-        let test_result = test_result(&desc, result);
+        let test_result = test_state(&desc, result);
         match test_result {
-            Err(Some(msg)) => assert!(msg.contains("expected panic with string value")),
-            _ => panic!("Result is {:?}", test_result)
+            TestResult::Failed(Some(msg)) => {
+                assert!(msg.contains("expected panic with string value"))
+            }
+            _ => panic!("Result is {:?}", test_result),
         }
     }
 
@@ -203,12 +313,13 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info("This is another message"));
-        let test_result = test_result(&desc, result);
+        let test_result = test_state(&desc, result);
         match test_result {
-            Err(Some(msg)) => assert!(msg.contains("panic did not contain expected string")),
-            _ => panic!("Result is {:?}", test_result)
+            TestResult::Failed(Some(msg)) => {
+                assert!(msg.contains("panic did not contain expected string"))
+            }
+            _ => panic!("Result is {:?}", test_result),
         }
-        
     }
 
     #[test]
@@ -216,10 +327,12 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Err(generate_panic_info(""));
-        let test_result = test_result(&desc, result);
+        let test_result = test_state(&desc, result);
         match test_result {
-            Err(Some(msg)) => assert!(msg.contains("panic did not contain expected string")),
-            _ => panic!("Result is {:?}", test_result)
+            TestResult::Failed(Some(msg)) => {
+                assert!(msg.contains("panic did not contain expected string"))
+            }
+            _ => panic!("Result is {:?}", test_result),
         }
     }
 
@@ -228,10 +341,12 @@ mod tests {
         let mut desc = default_test_desc();
         desc.should_panic = test::ShouldPanic::YesWithMessage("This is a message");
         let result = Ok(());
-        let test_result = test_result(&desc, result);
+        let test_result = test_state(&desc, result);
         match test_result {
-            Err(Some(msg)) => assert!(msg.contains("test did not panic as expected")),
-            _ => panic!("Result is {:?}", test_result)
+            TestResult::Failed(Some(msg)) => {
+                assert!(msg.contains("test did not panic as expected"))
+            }
+            _ => panic!("Result is {:?}", test_result),
         }
     }
 }
