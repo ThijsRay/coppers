@@ -17,9 +17,8 @@
 use coppers_sensors::{RAPLSensor, Sensor};
 use std::any::Any;
 use std::io::{self, Write};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::catch_unwind;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 use test::{StaticTestFn, TestDescAndFn};
 
 pub fn runner(tests: &[&test::TestDescAndFn]) {
@@ -28,12 +27,15 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     println!("Running {} tests", tests.len());
 
     let mut ignored = 0;
-    let mut filtered = 0;
-
-    let now = Instant::now();
+    //let mut filtered = 0;
 
     let mut passed_tests = Vec::new();
     let mut failed_tests = Vec::new();
+
+    let mut sensor =
+        RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string())
+            .unwrap();
+    sensor.start_measuring();
 
     for test in tests {
         let result = run_test(test);
@@ -42,20 +44,17 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
             TestResult::Passed => passed_tests.push(result),
             TestResult::Failed(_) => failed_tests.push(result),
             TestResult::Ignored => ignored += 1,
-            TestResult::Filtered => filtered += 1,
+            //TestResult::Filtered => filtered += 1,
         }
-
-        //println!("{}", result.sensor.unwrap().get_measured_uj())
     }
 
-    let elapsed = now.elapsed();
-    let seconds = elapsed.as_secs();
-    let millis = elapsed.subsec_millis();
+    sensor.stop_measuring();
+    let elapsed = sensor.get_elapsed_time_us();
+    let uj = sensor.get_measured_uj();
 
     print_failures(&failed_tests).unwrap();
 
-    let total = passed_tests.len() + failed_tests.len();
-    println!("test result: {}. {} passed; {} failed; {ignored} ignored; {filtered} filtered out; finished in {seconds}.{millis}s", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
+    println!("test result: {}. {} passed; {} failed; {ignored} ignored; finished in {elapsed} μs consuming {uj} μJ", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
@@ -65,18 +64,18 @@ fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
         for test in tests {
             if let Some(captured) = &test.stdout {
                 handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.desc.name))?;
-                handle.write_all(&captured)?;
-                handle.write(b"\n")?;
+                handle.write_all(captured)?;
+                handle.write_all(b"\n")?;
             }
         }
-        handle.write(b"\nfailures:\n")?;
+        handle.write_all(b"\nfailures:\n")?;
         for test in tests {
             handle.write_fmt(format_args!("\t{}", test.desc.name))?;
             if let TestResult::Failed(Some(msg)) = &test.state {
-                handle.write_fmt(format_args!(": {}\n", msg));
+                handle.write_fmt(format_args!(": {}\n", msg))?;
             }
         }
-        handle.write(b"\n")?;
+        handle.write_all(b"\n")?;
     }
     Ok(())
 }
@@ -84,20 +83,17 @@ fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
 fn print_test_result(test: &CompletedTest) {
     match test.state {
         TestResult::Passed => {
-            let sensor = test.sensor.as_ref().unwrap();
-            let uj = (*sensor).get_measured_uj();
-            let us = (*sensor).get_elapsed_time_us();
-            println!("test {} ... {} - [{uj} μJ in {us} μs]", test.desc.name, passed(true))
-        },
+            let uj = test.uj.unwrap();
+            let us = test.us.unwrap();
+            println!(
+                "test {} ... {} - [{uj} μJ in {us} μs]",
+                test.desc.name,
+                passed(true)
+            )
+        }
         TestResult::Failed(_) => {
-            if let Some(sensor) = &test.sensor {
-                let uj = (*sensor).get_measured_uj();
-                let us = (*sensor).get_elapsed_time_us();
-                println!("test {} ... {} - [{uj} μJ in {us} μs]", test.desc.name, passed(false))
-            } else {
-                println!("test {} ... {}", test.desc.name, passed(false))
-            }
-        },
+            println!("test {} ... {}", test.desc.name, passed(false))
+        }
         _ => {}
     }
 }
@@ -125,13 +121,14 @@ enum TestResult {
     Passed,
     Failed(Option<String>),
     Ignored,
-    Filtered,
+    //Filtered,
 }
 
 struct CompletedTest {
     desc: test::TestDesc,
     state: TestResult,
-    sensor: Option<Box<dyn Sensor>>,
+    uj: Option<u128>,
+    us: Option<u128>,
     stdout: Option<Vec<u8>>,
 }
 
@@ -140,7 +137,8 @@ impl CompletedTest {
         CompletedTest {
             desc,
             state: TestResult::Ignored,
-            sensor: None,
+            uj: None,
+            us: None,
             stdout: None,
         }
     }
@@ -151,34 +149,36 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
     if test.desc.ignore {
         CompletedTest::empty(test.desc)
     } else {
-        let sensor =
-            RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string());
-
-        // If the sensor could not be properly created, mark the test as failed.
-        if sensor.is_err() {
-            return sensor
-                .map_err(|err| CompletedTest {
-                    state: TestResult::Failed(Some(err.to_string())),
-                    ..CompletedTest::empty(test.desc)
-                })
-                .unwrap_err();
-        }
-        let mut sensor = sensor.unwrap();
+        let mut sensor =
+            RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string())
+                .unwrap();
 
         // Use internal compiler function `set_output_capture` to capture the output of the
         // tests.
         let data = Arc::new(Mutex::new(Vec::new()));
         io::set_output_capture(Some(data.clone()));
 
-        let result = match test.testfn {
-            test::TestFn::StaticTestFn(f) => catch_unwind(AssertUnwindSafe(|| {
-                sensor.start_measuring();
+        let mut uj = 0;
+        let mut us = 0;
+
+        let state = match test.testfn {
+            test::TestFn::StaticTestFn(f) => {
+                let mut state = TestResult::Ignored;
                 // Run the test function 100 times in a row
                 for _ in 0..100 {
-                    f();
+                    sensor.start_measuring();
+                    let result = catch_unwind(f);
+                    sensor.stop_measuring();
+                    uj += sensor.get_measured_uj();
+                    us += sensor.get_elapsed_time_us();
+
+                    state = test_state(&test.desc, result);
+                    if state != TestResult::Passed {
+                        break;
+                    }
                 }
-                sensor.stop_measuring();
-            })),
+                state
+            }
             _ => unimplemented!("Only StaticTestFns are supported right now"),
         };
 
@@ -187,11 +187,11 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         io::set_output_capture(None);
         let stdout = Some(data.lock().unwrap_or_else(|e| e.into_inner()).to_vec());
 
-        let state = test_state(&test.desc, result);
         CompletedTest {
             desc: test.desc,
             state,
-            sensor: Some(Box::new(sensor)),
+            uj: Some(uj),
+            us: Some(us),
             stdout,
         }
     }

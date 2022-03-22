@@ -96,12 +96,12 @@ impl Sensor for RAPLSensor {
 
 // Implementation of RAPLSensor sepcific functions
 impl RAPLSensor {
-    pub fn new(location: String) -> Result<RAPLSensor, &'static str> {
-        let enabled_location = location.to_string() + "/enabled";
-        let enabled = read_to_string(enabled_location);
+    pub fn new(location: String) -> Result<RAPLSensor, String> {
+        let enabled_location = format!("{location}/enabled");
+        let enabled = read_to_string(&enabled_location);
         // Check whether the location is actually reachable
         if enabled.is_err() {
-            return Err("Given location is unreachable");
+            return Err(format!("The location `{location}` is unreachable"));
         }
         // Check if RAPL is enabled at this location
         // No error received to unwrap is possible
@@ -109,10 +109,10 @@ impl RAPLSensor {
             return Err("RAPL sensor is not enabled");
         }*/
         // Check whether permission is set correctly of the measuring location
-        let measuring_location = location.to_string() + "/energy_uj";
-        let measured_energy = read_to_string(measuring_location);
+        let measuring_location = format!("{location}/energy_uj");
+        let measured_energy = read_to_string(&measuring_location);
         if measured_energy.is_err() {
-            return Err("Missing rights to read from /energy_uj");
+            return Err(format!("Insufficient permissions to read from {measuring_location}. You might want to retry as root."));
         }
         // Retrieve the max range value of the sensor
         let max_range_location = location.to_string() + "/max_energy_range_uj";
