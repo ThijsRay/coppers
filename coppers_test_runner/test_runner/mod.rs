@@ -15,6 +15,7 @@
 // Note that this is heavily inspired by libtest that is part of the Rust language.
 
 use coppers_sensors::{RAPLSensor, Sensor};
+use serde::{Serialize};
 use std::any::Any;
 use std::io::{self, Write};
 use std::panic::catch_unwind;
@@ -99,12 +100,14 @@ fn print_test_result(test: &CompletedTest) {
             let us = test.us.unwrap();
             println!(
                 "test {} ... {} - [{uj} μJ in {us} μs]",
-                test.desc.name,
+                test.name,
                 passed(true)
             )
+            let json = serde_json::to_string(test).unwrap();
+            println!("test JSON: {}", json);
         }
         TestResult::Failed(_) => {
-            println!("test {} ... {}", test.desc.name, passed(false))
+            println!("test {} ... {}", test.name, passed(false))
         }
         _ => {}
     }
@@ -136,8 +139,9 @@ enum TestResult {
     //Filtered,
 }
 
+#[derive(Serialize)]
 struct CompletedTest {
-    desc: test::TestDesc,
+    name: String,
     state: TestResult,
     uj: Option<u128>,
     us: Option<u128>,
@@ -145,9 +149,9 @@ struct CompletedTest {
 }
 
 impl CompletedTest {
-    fn empty(desc: test::TestDesc) -> Self {
+    fn empty(name: String) -> Self {
         CompletedTest {
-            desc,
+            name,
             state: TestResult::Ignored,
             uj: None,
             us: None,
