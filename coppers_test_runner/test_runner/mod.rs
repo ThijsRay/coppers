@@ -15,8 +15,9 @@
 // Note that this is heavily inspired by libtest that is part of the Rust language.
 
 use coppers_sensors::{RAPLSensor, Sensor};
-use serde::{Serialize};
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 use std::any::Any;
+use std::fs::File;
 use std::io::{self, Write};
 use std::panic::catch_unwind;
 use std::sync::{Arc, Mutex};
@@ -67,7 +68,12 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
 
     print_failures(&failed_tests).unwrap();
 
-    println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
+    println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
+    // Write test results to JSON file
+    let json_result = serde_json::to_string(&passed_tests).unwrap();
+    
+    let mut file = File::create("target/copper_results.json").unwrap();
+    file.write_all(json_result.as_bytes()).expect("Writing of JSON file failed.");
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
@@ -100,14 +106,12 @@ fn print_test_result(test: &CompletedTest) {
             let us = test.us.unwrap();
             println!(
                 "test {} ... {} - [{uj} μJ in {us} μs]",
-                test.name,
+                test.desc.name,
                 passed(true)
             )
-            let json = serde_json::to_string(test).unwrap();
-            println!("test JSON: {}", json);
         }
         TestResult::Failed(_) => {
-            println!("test {} ... {}", test.name, passed(false))
+            println!("test {} ... {}", test.desc.name, passed(false))
         }
         _ => {}
     }
@@ -131,7 +135,7 @@ fn make_owned_test(test: &&TestDescAndFn) -> TestDescAndFn {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(serde::Serialize, Debug, PartialEq)]
 enum TestResult {
     Passed,
     Failed(Option<String>),
@@ -139,19 +143,34 @@ enum TestResult {
     //Filtered,
 }
 
-#[derive(Serialize)]
 struct CompletedTest {
-    name: String,
+    desc: test::TestDesc,
     state: TestResult,
     uj: Option<u128>,
     us: Option<u128>,
     stdout: Option<Vec<u8>>,
 }
 
+impl Serialize for CompletedTest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // 4 is the number of fields in the final serialization
+        // stdout is excluded and desc is changed into only its name
+        let mut state = serializer.serialize_struct("CompletedTest", 4)?;
+        state.serialize_field("name", &self.desc.name.as_slice())?;
+        state.serialize_field("state", &self.state)?;
+        state.serialize_field("uj", &self.uj)?;
+        state.serialize_field("us", &self.us)?;
+        state.end()
+    }
+}
+
 impl CompletedTest {
-    fn empty(name: String) -> Self {
+    fn empty(desc: test::TestDesc) -> Self {
         CompletedTest {
-            name,
+            desc,
             state: TestResult::Ignored,
             uj: None,
             us: None,
