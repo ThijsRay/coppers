@@ -89,7 +89,8 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     let json_tests = serde_json::to_string(&passed_tests).unwrap();
     let full_json = format!("{{\"timestamp\":{timestamp},\"head\":{head_hash_json}\"total_time\":{total_us},\"total_consumption\":{total_uj},\"overhead_time\":{overhead_us},\"overhead_consumption\":{overhead_uj},\"tests\":{json_tests}}}");
 
-    let mut file = File::create("target/copper_results.json").unwrap();
+    let json_file_name = format!("target/copper_results-{timestamp}.json");
+    let mut file = File::create(json_file_name).unwrap();
     file.write_all(full_json.as_bytes())
         .expect("Writing of JSON file failed.");
 }
