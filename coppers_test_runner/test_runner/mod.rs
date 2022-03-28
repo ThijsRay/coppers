@@ -21,6 +21,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::panic::catch_unwind;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use test::{StaticTestFn, TestDescAndFn};
 
 const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
@@ -70,10 +71,12 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
 
     println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
     // Write test results to JSON file
-    let json_result = serde_json::to_string(&passed_tests).unwrap();
+    let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+    let json_tests = serde_json::to_string(&passed_tests).unwrap();
+    let full_json = format!("{{\"timestamp\":{timestamp},\"total_time\":{total_us},\"total_consumption\":{total_uj},\"overhead_time\":{overhead_us},\"overhead_consumption\":{overhead_uj},\"tests\":{json_tests}}}");
     
     let mut file = File::create("target/copper_results.json").unwrap();
-    file.write_all(json_result.as_bytes()).expect("Writing of JSON file failed.");
+    file.write_all(full_json.as_bytes()).expect("Writing of JSON file failed.");
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
@@ -281,7 +284,7 @@ mod tests {
         TestDesc {
             name: test::StaticTestName("Test"),
             ignore: false,
-            ignore_message: None,
+            allow_fail: false,
             should_panic: test::ShouldPanic::No,
             compile_fail: false,
             no_run: false,
