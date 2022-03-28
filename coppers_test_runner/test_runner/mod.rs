@@ -15,7 +15,7 @@
 // Note that this is heavily inspired by libtest that is part of the Rust language.
 
 use coppers_sensors::{RAPLSensor, Sensor};
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::any::Any;
 use std::fs::File;
 use std::io::{self, Write};
@@ -53,7 +53,7 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
                 test_uj += result.uj.unwrap();
                 test_us += result.us.unwrap();
                 passed_tests.push(result);
-            },
+            }
             TestResult::Failed(_) => failed_tests.push(result),
             TestResult::Ignored => ignored += 1,
             //TestResult::Filtered => filtered += 1,
@@ -71,12 +71,16 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
 
     println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
     // Write test results to JSON file
-    let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     let json_tests = serde_json::to_string(&passed_tests).unwrap();
     let full_json = format!("{{\"timestamp\":{timestamp},\"total_time\":{total_us},\"total_consumption\":{total_uj},\"overhead_time\":{overhead_us},\"overhead_consumption\":{overhead_uj},\"tests\":{json_tests}}}");
-    
+
     let mut file = File::create("target/copper_results.json").unwrap();
-    file.write_all(full_json.as_bytes()).expect("Writing of JSON file failed.");
+    file.write_all(full_json.as_bytes())
+        .expect("Writing of JSON file failed.");
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
