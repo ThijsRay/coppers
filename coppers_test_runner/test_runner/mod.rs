@@ -73,6 +73,16 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
 
     println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
     // Write test results to JSON file
+    write_to_json(passed_tests, total_us, total_uj, overhead_us, overhead_uj)
+}
+
+fn write_to_json(
+    passed_tests: Vec<CompletedTest>,
+    total_us: u128,
+    total_uj: u128,
+    overhead_us: u128,
+    overhead_uj: u128,
+) {
     // Get git hash of last commit
     // WARNING: ASSUMING REPO EXISTS!
     let current_directory = current_dir().unwrap();
@@ -82,10 +92,13 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     let head_hash_bytes = head_hash.as_bytes();
     let head_hash_json = serde_json::to_string(&head_hash_bytes).unwrap();
 
+    // Get the timestamp of the current time
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_secs();
+
+    // Convert test results in JSON object
     let json_tests = serde_json::to_string(&passed_tests).unwrap();
     let full_json = format!("{{\"timestamp\":{timestamp},\"head\":{head_hash_json}\"total_time\":{total_us},\"total_consumption\":{total_uj},\"overhead_time\":{overhead_us},\"overhead_consumption\":{overhead_uj},\"tests\":{json_tests}}}");
 
