@@ -24,7 +24,7 @@ def visualize_all_tests(data, n):
 
 def visualize_over_time():
     all_runs = pd.DataFrame()
-    for filename in os.listdir(f"{RESULT_PATH}"):
+    for filename in os.listdir(f"{RESULT_PATH}") if "json" in filename:
         with open(f"{RESULT_PATH}/{filename}", "r") as f:
             result = json.load(f)
             new_res = pd.json_normalize(result, record_path="tests", meta=["timestamp"])
@@ -42,7 +42,7 @@ def comparison_to_last(data):
     last_execution_filename = ""
     last_execution_timestamp = 0
     n = float(data["number_of_repeats"])
-    for filename in os.listdir(f"{RESULT_PATH}"):
+    for filename in os.listdir(f"{RESULT_PATH}") if "json" in filename:
         with open(f"{RESULT_PATH}/{filename}", "r") as f:
             result = json.load(f)
             if result["timestamp"] > last_execution_timestamp and last_execution_timestamp < data["timestamp"]:
@@ -83,8 +83,9 @@ def comparison_to_last(data):
 def main(timestamp=1648463059):
     rep = Report("template")
     results = get_data(f"copper_results-{timestamp}")
+    amount_of_results = len([filename for filename in os.listdir(RESULT_PATH) if "json" in filename])
 
-    if len(os.listdir(RESULT_PATH)) > 2:
+    if amount_of_results > 2:
         rep.jinja['over_time'] = True
         rep.jinja['plot_energy_over_time'] = visualize_over_time()
 
@@ -96,7 +97,7 @@ def main(timestamp=1648463059):
     rep.jinja['least_energy_consuming_names'] = [sorted_tests[-(i+1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
     rep.jinja['least_energy_consuming_usages'] = [sorted_tests[-(i+1)]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
 
-    if len(os.listdir(RESULT_PATH)) > 1:
+    if amount_of_results > 1:
         rep.jinja["compare_to_last"] = True
         rep.jinja["overall_change"], rep.jinja["comparison_table"] = comparison_to_last(results)
 
