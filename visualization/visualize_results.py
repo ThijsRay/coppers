@@ -12,6 +12,7 @@ RESULT_PATH = "../results"
 def is_coppers_file(filename):
     return ".json" in filename and "coppers_results" in filename
 
+
 def get_data():
     last_execution_filename = ""
     last_execution_timestamp = 0
@@ -19,9 +20,9 @@ def get_data():
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                if result["timestamp"] > last_execution_timestamp:
+                if result["execution_timestamp"] > last_execution_timestamp:
                     last_execution_filename = filename
-                    last_execution_timestamp = result["timestamp"]
+                    last_execution_timestamp = result["execution_timestamp"]
 
     with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
         results = json.load(f)
@@ -34,6 +35,8 @@ def visualize_all_tests(data, n):
     fig = px.bar(x=bars, y=x, labels={"x": "Energy consumption (uJ)", "y": "Test"})
     return plotly.io.to_html(fig)
 
+def to_commit_hash(head):
+    return ''.join('{:02x}'.format(x) for x in head)
 
 def visualize_over_time():
     all_runs = pd.DataFrame()
@@ -41,14 +44,43 @@ def visualize_over_time():
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                new_res = pd.json_normalize(result, record_path="tests", meta=["timestamp"])
+                result["head"] = to_commit_hash(result["head"])
+                new_res = pd.json_normalize(result, record_path="tests", meta=["execution_timestamp", "commit_timestamp", "head"])
                 n = float(result["number_of_repeats"])
                 new_res['uj'] = new_res['uj']/n
                 new_res['us'] = new_res['uj']/n
                 all_runs = pd.concat([all_runs, new_res], axis=0)
-    all_runs = all_runs.sort_values(by="timestamp")
-    all_runs["timestamp"] = pd.to_datetime(all_runs['timestamp'], unit='s')
-    fig = px.line(all_runs, x="timestamp", y="uj", color="name", markers="name", labels={"timestamp": "Time of execution", "uj": "Energy consumption (uJ)"})
+    all_runs = all_runs.sort_values(by="execution_timestamp")
+    all_runs = all_runs.sort_values(by="commit_timestamp")
+
+    i = -1
+    last_timestamp = 0
+    sequential_index = []
+    tick_vals = []
+    tick_texts = []
+    for test in all_runs.iterrows():
+        if last_timestamp < test[1]["execution_timestamp"]:
+            i += 1
+            last_timestamp = test[1]["execution_timestamp"]
+            tick_vals.append(i)
+            text = ""
+            for elem in test[1]["head"]:
+                text = text + elem
+            tick_texts.append(text)
+        sequential_index.append(i)
+    all_runs = all_runs.assign(sequential_index=sequential_index)
+    # all_runs["timestamp"] = pd.to_datetime(all_runs['timestamp'], unit='s')
+
+    fig = px.line(all_runs, x="sequential_index", y="uj", color="name", markers="name", labels={"sequential_index": "Commit", "uj": "Energy consumption (uJ)"})
+
+    fig.update_layout(
+        xaxis=dict(
+            tickmode='array',
+            tickvals=tick_vals,
+            ticktext=tick_texts
+        )
+    )
+
     return plotly.io.to_html(fig)
 
 
@@ -60,9 +92,9 @@ def comparison_to_last(data):
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                if result["timestamp"] > last_execution_timestamp and last_execution_timestamp < data["timestamp"]:
+                if result["execution_timestamp"] > last_execution_timestamp and last_execution_timestamp < data["execution_timestamp"]:
                     last_execution_filename = filename
-                    last_execution_timestamp = result["timestamp"]
+                    last_execution_timestamp = result["execution_timestamp"]
 
     with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
         last_result = json.load(f)
