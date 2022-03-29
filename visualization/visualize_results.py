@@ -9,8 +9,21 @@ AMOUNT_OF_TESTS_IN_TOP = 3
 RESULT_PATH = "../results"
 
 
-def get_data(filename):
-    with open(f"{RESULT_PATH}/{filename}.json", "r") as f:
+def is_coppers_file(filename):
+    return ".json" in filename and "coppers_results" in filename
+
+def get_data():
+    last_execution_filename = ""
+    last_execution_timestamp = 0
+    for filename in os.listdir(f"{RESULT_PATH}"):
+        if is_coppers_file(filename):
+            with open(f"{RESULT_PATH}/{filename}", "r") as f:
+                result = json.load(f)
+                if result["timestamp"] > last_execution_timestamp:
+                    last_execution_filename = filename
+                    last_execution_timestamp = result["timestamp"]
+
+    with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
         results = json.load(f)
     return results
 
@@ -25,7 +38,7 @@ def visualize_all_tests(data, n):
 def visualize_over_time():
     all_runs = pd.DataFrame()
     for filename in os.listdir(f"{RESULT_PATH}"):
-        if "json" in filename:
+        if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
                 new_res = pd.json_normalize(result, record_path="tests", meta=["timestamp"])
@@ -44,7 +57,7 @@ def comparison_to_last(data):
     last_execution_timestamp = 0
     n = float(data["number_of_repeats"])
     for filename in os.listdir(f"{RESULT_PATH}"):
-        if "json" in filename:
+        if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
                 if result["timestamp"] > last_execution_timestamp and last_execution_timestamp < data["timestamp"]:
@@ -82,9 +95,9 @@ def comparison_to_last(data):
     return change_overall, df.to_html()
 
 
-def main(timestamp=1648463059):
+def main():
     rep = Report("template")
-    results = get_data(f"copper_results-{timestamp}")
+    results = get_data()
     amount_of_results = len([filename for filename in os.listdir(RESULT_PATH) if "json" in filename])
 
     if amount_of_results > 2:
