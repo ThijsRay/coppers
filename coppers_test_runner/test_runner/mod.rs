@@ -313,7 +313,7 @@ mod tests {
         TestDesc {
             name: test::StaticTestName("Test"),
             ignore: false,
-            allow_fail: false,
+            ignore_message: None,
             should_panic: test::ShouldPanic::No,
             compile_fail: false,
             no_run: false,
