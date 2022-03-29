@@ -16,7 +16,6 @@
 
 use coppers_sensors::{RAPLSensor, Sensor};
 use git2::Repository;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::any::Any;
 use std::env::current_dir;
 use std::fs::File;
@@ -112,16 +111,9 @@ fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
     if !tests.is_empty() {
         let stdout = io::stdout();
         let mut handle = stdout.lock();
-        for test in tests {
-            if let Some(captured) = &test.stdout {
-                handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.desc.name))?;
-                handle.write_all(captured)?;
-                handle.write_all(b"\n")?;
-            }
-        }
         handle.write_all(b"\nfailures:\n")?;
         for test in tests {
-            handle.write_fmt(format_args!("\t{}", test.desc.name))?;
+            handle.write_fmt(format_args!("\t{}", test.name))?;
             if let TestResult::Failed(Some(msg)) = &test.state {
                 handle.write_fmt(format_args!(": {}\n", msg))?;
             }
@@ -138,12 +130,12 @@ fn print_test_result(test: &CompletedTest) {
             let us = test.us.unwrap();
             println!(
                 "test {} ... {} - [{uj} μJ in {us} μs]",
-                test.desc.name,
+                test.name,
                 passed(true)
             )
         }
         TestResult::Failed(_) => {
-            println!("test {} ... {}", test.desc.name, passed(false))
+            println!("test {} ... {}", test.name, passed(false))
         }
         _ => {}
     }
@@ -175,38 +167,22 @@ enum TestResult {
     //Filtered,
 }
 
+#[derive(serde::Serialize, Debug, PartialEq)]
 struct CompletedTest {
-    desc: test::TestDesc,
+    name: String,
     state: TestResult,
     uj: Option<u128>,
     us: Option<u128>,
-    stdout: Option<Vec<u8>>,
 }
 
-impl Serialize for CompletedTest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // 4 is the number of fields in the final serialization
-        // stdout is excluded and desc is changed into only its name
-        let mut state = serializer.serialize_struct("CompletedTest", 4)?;
-        state.serialize_field("name", &self.desc.name.as_slice())?;
-        state.serialize_field("state", &self.state)?;
-        state.serialize_field("uj", &self.uj)?;
-        state.serialize_field("us", &self.us)?;
-        state.end()
-    }
-}
 
 impl CompletedTest {
-    fn empty(desc: test::TestDesc) -> Self {
+    fn empty(name: String) -> Self {
         CompletedTest {
-            desc,
+            name,
             state: TestResult::Ignored,
             uj: None,
             us: None,
-            stdout: None,
         }
     }
 }
@@ -214,7 +190,7 @@ impl CompletedTest {
 fn run_test(test: test::TestDescAndFn) -> CompletedTest {
     // If a test is marked with #[ignore], it should not be executed
     if test.desc.ignore {
-        CompletedTest::empty(test.desc)
+        CompletedTest::empty(test.desc.name.to_string())
     } else {
         let mut sensor =
             RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string())
@@ -252,14 +228,12 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         // Reset the output capturing to the default behavior and transform the captured output
         // to a vector of bytes.
         io::set_output_capture(None);
-        let stdout = Some(data.lock().unwrap_or_else(|e| e.into_inner()).to_vec());
 
         CompletedTest {
-            desc: test.desc,
+            name: test.desc.name.to_string(),
             state,
             uj: Some(uj),
             us: Some(us),
-            stdout,
         }
     }
 }
