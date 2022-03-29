@@ -32,11 +32,13 @@ def get_data():
 def visualize_all_tests(data, n):
     bars = [test["uj"]/n for test in reversed(data)]
     x = [test["name"] for test in reversed(data)]
-    fig = px.bar(x=bars, y=x, labels={"x": "Energy consumption (uJ)", "y": "Test"})
+    fig = px.bar(x=bars, y=x, labels={"x": "Energy consumption (\u03bcJ)", "y": "Test"})
     return plotly.io.to_html(fig)
+
 
 def to_commit_hash(head):
     return ''.join('{:02x}'.format(x) for x in head)
+
 
 def visualize_over_time():
     all_runs = pd.DataFrame()
@@ -71,7 +73,7 @@ def visualize_over_time():
     all_runs = all_runs.assign(sequential_index=sequential_index)
     # all_runs["timestamp"] = pd.to_datetime(all_runs['timestamp'], unit='s')
 
-    fig = px.line(all_runs, x="sequential_index", y="uj", color="name", markers="name", labels={"sequential_index": "Commit", "uj": "Energy consumption (uJ)"})
+    fig = px.line(all_runs, x="sequential_index", y="uj", color="name", markers="name", labels={"sequential_index": "Commit", "\u03bcj": "Energy consumption (\u03bcJ)"})
 
     fig.update_layout(
         xaxis=dict(
@@ -121,9 +123,9 @@ def comparison_to_last(data):
             (test["us"] - test_before["us"]) / test_before["us"] * 100,
 
         ])
-    df = pd.DataFrame(comparison_data, columns=["Name", f"Usage (uJ) before", f"Usage (uJ) new",
-                                                f"Change usage (uJ)", "Change usage (%)", f"Time (us) new",
-                                                f"Time (us) before", f"Change time (us)", "Change time (%)"])
+    df = pd.DataFrame(comparison_data, columns=["Name", f"Usage (\u03bcJ) before", f"Usage (\u03bcJ) new",
+                                                f"Change usage (\u03bcJ)", "Change usage (%)", f"Time (\u03bcs) new",
+                                                f"Time (\u03bcs) before", f"Change time (\u03bcs)", "Change time (%)"])
     return change_overall, df.to_html()
 
 
