@@ -180,6 +180,7 @@ mod tests {
         assert_eq!(result, 12345678901234567890123456789);
     }
     #[test]
+    #[ignore]
     fn test_rapl_sensor() {
         let mut sensor = RAPLSensor::new(String::from(
             "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0",
