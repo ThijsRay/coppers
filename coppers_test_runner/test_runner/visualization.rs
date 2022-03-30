@@ -84,7 +84,7 @@ TEMPLATE = """
 """
 
 AMOUNT_OF_TESTS_IN_TOP = 3
-RESULT_PATH = "target/copper_results"
+RESULT_PATH = "target/coppers_results"
 
 def is_coppers_file(filename):
     return ".json" in filename and "coppers_results" in filename
@@ -93,18 +93,17 @@ def is_coppers_file(filename):
 def get_data():
     last_execution_filename = ""
     last_execution_timestamp = 0
-    print()
-    # for filename in os.listdir(f"{RESULT_PATH}"):
-    #    if is_coppers_file(filename):
-    #        with open(f"{RESULT_PATH}/{filename}", "r") as f:
-    #            result = json.load(f)
-    #            if result["execution_timestamp"] > last_execution_timestamp:
-    #                last_execution_filename = filename
-    #                last_execution_timestamp = result["execution_timestamp"]
+    for filename in os.listdir(f"{RESULT_PATH}"):
+       if is_coppers_file(filename):
+           with open(f"{RESULT_PATH}/{filename}", "r") as f:
+               result = json.load(f)
+               if result["execution_timestamp"] > last_execution_timestamp:
+                   last_execution_filename = filename
+                   last_execution_timestamp = result["execution_timestamp"]
 
-    # with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
-    #    results = json.load(f)
-    #    return results
+    with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
+       results = json.load(f)
+       return results
 
 
 def visualize_all_tests(data, n):
@@ -114,17 +113,12 @@ def visualize_all_tests(data, n):
     return plotly.io.to_html(fig)
 
 
-def to_commit_hash(head):
-    return ''.join('{:02x}'.format(x) for x in head)
-
-
 def visualize_over_time():
     all_runs = pd.DataFrame()
     for filename in os.listdir(f"{RESULT_PATH}"):
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                result["head"] = to_commit_hash(result["head"])
                 new_res = pd.json_normalize(result, record_path="tests", meta=["execution_timestamp", "commit_timestamp", "head"])
                 n = float(result["number_of_repeats"])
                 new_res['uj'] = new_res['uj']/n
@@ -178,7 +172,7 @@ def comparison_to_last(data):
 
     with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
         last_result = json.load(f)
-    change_overall = data["total_consumption"]/n - last_result["total_consumption"]/n
+    change_overall = data["total_uj"]/n - last_result["total_uj"]/n
 
     comparison_data = []
     for test in data["tests"]:
@@ -212,40 +206,41 @@ def main():
     jinja = {}
     
     results = get_data()
-    # amount_of_results = len([filename for filename in os.listdir(RESULT_PATH) if "json" in filename])
+    amount_of_results = len([filename for filename in os.listdir(RESULT_PATH) if "json" in filename])
 
-    # if amount_of_results > 2:
-    #   jinja['over_time'] = True
-    #   jinja['plot_energy_over_time'] = visualize_over_time()
+    if amount_of_results > 2:
+      jinja['over_time'] = True
+      jinja['plot_energy_over_time'] = visualize_over_time()
 
-    # sorted_tests = sorted(results["tests"], reverse=True, key=lambda item: item["uj"])
-    # n = float(results["number_of_repeats"])
-    # jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
-    # jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    # jinja['most_energy_consuming_usages'] = [sorted_tests[i]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    # jinja['least_energy_consuming_names'] = [sorted_tests[-(i+1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    # jinja['least_energy_consuming_usages'] = [sorted_tests[-(i+1)]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    sorted_tests = sorted(results["tests"], reverse=True, key=lambda item: item["uj"])
+    n = float(results["number_of_repeats"])
+    jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
+    jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['most_energy_consuming_usages'] = [sorted_tests[i]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['least_energy_consuming_names'] = [sorted_tests[-(i+1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['least_energy_consuming_usages'] = [sorted_tests[-(i+1)]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
 
-    # if amount_of_results > 1:
-    #     jinja["compare_to_last"] = True
-    #     jinja["overall_change"], jinja["comparison_table"] = comparison_to_last(results)
+    if amount_of_results > 1:
+        jinja["compare_to_last"] = True
+        jinja["overall_change"], jinja["comparison_table"] = comparison_to_last(results)
 
-    # jinja['all_tests_plot'] = visualize_all_tests(sorted_tests, n)
+    jinja['all_tests_plot'] = visualize_all_tests(sorted_tests, n)
 
-    # generate_report(template, jinja)
-    # print("------- Generated report of energy consumption results -------")
+    report_folder = "target/coppers_report"
+    generate_report(template, jinja, report_folder)
+    print(f"> Generated report of energy consumption results in \"{report_folder}\"")
 
 
-def generate_report(template, jinja):
-    if not os.path.isdir("report"):
-        os.mkdir("report")
+def generate_report(template, jinja, report_folder):
+    if not os.path.isdir(report_folder):
+        os.mkdir(report_folder)
 
-    if not os.path.isdir("report/images"):
-        os.mkdir("report/images")
+    if not os.path.isdir(f"{report_folder}/images"):
+        os.mkdir(f"{report_folder}/images")
 
-    with open("report/index.html", "w") as fh:
-            data = template.render(jinja)
-            fh.write(data)
+    with open(f"{report_folder}/index.html", "w") as fh:
+        data = template.render(jinja)
+        fh.write(data)
 
 main()
 "#;
