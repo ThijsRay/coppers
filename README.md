@@ -71,8 +71,7 @@ For the most accurate, reliable and reproducible results, you could take certain
 ## Troubleshooting
 
 ### Intel RAPL sensors are not enabled
-
-You can enable on the Intel RAPL sensors with modprobe in the following way `modprobe intel_rapl_common` for Linux kernels of >= 5. Do you have a kernel version of < 5, then use `modprobe intel_rapl`. Unfortunatly, Coppers does not support non-Intel based machines at this time.
+You might get an error like `The location `/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0` is unreachable`. If you have an Intel based machine, then you can enable on the Intel RAPL sensors with modprobe in the following way `modprobe intel_rapl_common` for Linux kernels of >= 5. Do you have a kernel version of < 5, then use `modprobe intel_rapl`. Unfortunatly, Coppers does not support non-Intel based machines at this time.
 
 ### Running the tests causes `Insufficient permissions`
 If you run `cargo test`, you might get an
@@ -85,6 +84,7 @@ error. This can be solved in one of two ways:
     1. `sudo chmod o+r /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/energy_uj`
     2. `cargo test`
     3. `sudo chmod o-r /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/energy_uj`
+
 
 ## About
 This project was done in the context of the [2022 edition of Sustainable Software Engineering course at Delft University of Technology](https://luiscruz.github.io/course_sustainableSE/2022/). We chose the name "Coppers" because our project relates to both green software and Rust, and oxidized copper has a green-ish color.
