@@ -9,8 +9,9 @@ use super::REPEAT_TESTS_AMOUNT_OF_TIMES;
 
 #[derive(serde::Serialize)]
 struct JsonResult {
-    timestamp: u64,
+    execution_timestamp: u64,
     head: String,
+    commit_timestamp: i64,
     total_us: u128,
     total_uj: u128,
     overhead_us: u128,
@@ -30,19 +31,20 @@ pub(crate) fn write_to_json(
     let current_directory = current_dir().unwrap();
     let current_path = current_directory.as_path().to_str().unwrap();
     let repo = Repository::open(current_path).unwrap();
-    let head_hash = repo.head().unwrap().target().unwrap();
-    let head_hash_bytes = head_hash.as_bytes();
-    let head = hex::encode(head_hash_bytes);
+    let git_head = repo.head().unwrap();
+    let head = hex::encode(git_head.target().unwrap().as_bytes());
+    let commit_timestamp = git_head.peel_to_commit().unwrap().time().seconds();
 
     // Get the timestamp of the current time
-    let timestamp = SystemTime::now()
+    let execution_timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_secs();
 
     let output = JsonResult {
-        timestamp,
+        execution_timestamp,
         head,
+        commit_timestamp,
         total_us,
         total_uj,
         overhead_us,
@@ -55,7 +57,7 @@ pub(crate) fn write_to_json(
     let output_json = serde_json::to_string(&output).unwrap();
 
     create_dir_all("target/coppers_results").unwrap();
-    let json_file_name = format!("target/coppers_results/coppers_results-{timestamp}.json");
+    let json_file_name = format!("target/coppers_results/coppers_results-{execution_timestamp}.json");
     let mut file = File::create(json_file_name).unwrap();
     file.write_all(output_json.as_bytes()).unwrap()
 }

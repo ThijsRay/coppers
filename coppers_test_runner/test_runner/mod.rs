@@ -18,13 +18,16 @@ use self::json::write_to_json;
 use coppers_sensors::{RAPLSensor, Sensor};
 use std::any::Any;
 use std::io::{self, Write};
-use std::panic::catch_unwind;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 use test::{StaticTestFn, TestDescAndFn};
 
 mod json;
 
-pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
+#[cfg(feature="visualization")]
+mod visualization;
+
+pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 15;
 
 pub fn runner(tests: &[&test::TestDescAndFn]) {
     let tests: Vec<_> = tests.iter().map(make_owned_test).collect();
@@ -70,8 +73,12 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     print_failures(&failed_tests).unwrap();
 
     println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
+    
     // Write test results to JSON file
-    write_to_json(passed_tests, total_us, total_uj, overhead_us, overhead_uj)
+    write_to_json(passed_tests, total_us, total_uj, overhead_us, overhead_uj);
+
+    #[cfg(feature = "visualization")]
+    self::visualization::visualize();
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
@@ -185,8 +192,10 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
                 let mut state = TestResult::Ignored;
                 // Run the test function 100 times in a row
                 for _ in 0..REPEAT_TESTS_AMOUNT_OF_TIMES {
-                    sensor.start_measuring();
-                    let result = catch_unwind(f);
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        sensor.start_measuring();
+                        f();
+                    }));
                     sensor.stop_measuring();
                     uj += sensor.get_measured_uj();
                     us += sensor.get_elapsed_time_us();
