@@ -16,13 +16,13 @@ import json
 import os
 import pandas as pd
 import plotly.io
-from reports import Report
+from jinja2 import Environment, FileSystemLoader
 import plotly.express as px
 
 
 
 AMOUNT_OF_TESTS_IN_TOP = 3
-RESULT_PATH = "../target/coppers_results/"
+RESULT_PATH = "../results/"
 
 
 def is_coppers_file(filename):
@@ -146,31 +146,46 @@ def comparison_to_last(data):
 
 
 def main():
-    rep = Report("template")
+    env = Environment()
+    env.loader = FileSystemLoader("template")
+    template = env.get_template("index.html")
+    jinja = {}
+    
     results = get_data()
     amount_of_results = len([filename for filename in os.listdir(RESULT_PATH) if "json" in filename])
 
     if amount_of_results > 2:
-        rep.jinja['over_time'] = True
-        rep.jinja['plot_energy_over_time'] = visualize_over_time()
+        jinja['over_time'] = True
+        jinja['plot_energy_over_time'] = visualize_over_time()
 
     sorted_tests = sorted(results["tests"], reverse=True, key=lambda item: item["uj"])
     n = float(results["number_of_repeats"])
-    rep.jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
-    rep.jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    rep.jinja['most_energy_consuming_usages'] = [sorted_tests[i]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    rep.jinja['least_energy_consuming_names'] = [sorted_tests[-(i+1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    rep.jinja['least_energy_consuming_usages'] = [sorted_tests[-(i+1)]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
+    jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['most_energy_consuming_usages'] = [sorted_tests[i]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['least_energy_consuming_names'] = [sorted_tests[-(i+1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['least_energy_consuming_usages'] = [sorted_tests[-(i+1)]['uj']/n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
 
     if amount_of_results > 1:
-        rep.jinja["compare_to_last"] = True
-        rep.jinja["overall_change"], rep.jinja["comparison_table"] = comparison_to_last(results)
+        jinja["compare_to_last"] = True
+        jinja["overall_change"], jinja["comparison_table"] = comparison_to_last(results)
 
-    rep.jinja['all_tests_plot'] = visualize_all_tests(sorted_tests, n)
+    jinja['all_tests_plot'] = visualize_all_tests(sorted_tests, n)
 
-    rep.create_report(onweb=False)
+    generate_report(template, jinja)
     print("------- Generated report of energy consumption results -------")
 
+
+def generate_report(template, jinja):
+    if not os.path.isdir("report"):
+        os.mkdir("report")
+
+    if not os.path.isdir("report/images"):
+        os.mkdir("report/images")
+
+    with open("report/index.html", "w") as fh:
+            data = template.render(jinja)
+            fh.write(data)
 
 if __name__ == "__main__":
     main()
