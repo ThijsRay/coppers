@@ -15,7 +15,7 @@
 // Note that this is heavily inspired by libtest that is part of the Rust language.
 
 use self::json::write_to_json;
-use coppers_sensors::{RAPLSensor, Sensor};
+use super::sensors::{RAPLSensor, Sensor};
 use std::any::Any;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};

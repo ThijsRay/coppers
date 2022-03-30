@@ -146,6 +146,7 @@ impl RAPLSensor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread::sleep;
 
     #[test]
     fn raplsensor_convert_read_string_to_u128_zero() {
@@ -177,5 +178,16 @@ mod tests {
             "12345678901234567890123456789\n",
         ));
         assert_eq!(result, 12345678901234567890123456789);
+    }
+    #[test]
+    fn test_rapl_sensor() {
+        let mut sensor = RAPLSensor::new(String::from(
+            "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0",
+        ))
+        .unwrap();
+        sensor.start_measuring();
+        sleep(Duration::new(2, 0));
+        sensor.stop_measuring();
+        println!("measured {}uJ", sensor.get_measured_uj());
     }
 }

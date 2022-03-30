@@ -6,20 +6,16 @@ description = "Coppers is a custom test harnass that measures the energy usage o
 license = "Apache-2.0"
 repository = "https://github.com/ThijsRay/coppers"
 
-[lib]
-name = "coppers"
-path = "coppers_test_runner/lib.rs"
-
 [workspace]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-coppers_sensors = { path = "coppers_sensors"}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 git2 = "0.14.2"
 hex = "0.4.3"
+regex = "1"
 pyo3 = { version = "0.16", optional = true, features = ["auto-initialize"] }
 
 [features]

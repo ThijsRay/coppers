@@ -1,4 +1,4 @@
-// Copyright 2022 Thijs Raymakers, Jeffrey Bouman
+// Copyright 2022 Thijs Raymakers
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use coppers_sensors::*;
-use std::thread::sleep;
-use std::time::Duration;
+#![feature(test)]
+#![feature(internal_output_capture)]
 
-#[test]
-fn test_rapl_sensor() {
-    let mut sensor = RAPLSensor::new(String::from(
-        "/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0",
-    ))
-    .unwrap();
-    sensor.start_measuring();
-    sleep(Duration::new(2, 0));
-    sensor.stop_measuring();
-    println!("measured {}uJ", sensor.get_measured_uj());
-}
+// Normally, we can use `use` to import a crate. However, the `test` crate is shipped
+// with Rust itself and thus it needs to be imported with `extern crate` because it is
+// a so called `sysroot` crate.
+// See https://doc.rust-lang.org/edition-guide/rust-2018/path-changes.html for more
+// information.
+extern crate test;
+
+mod sensors;
+mod test_runner;
+
+// Export the runner funcion so crates that depend on this crate can use it
+pub use crate::test_runner::runner;
