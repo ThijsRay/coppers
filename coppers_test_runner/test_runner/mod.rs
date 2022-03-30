@@ -78,6 +78,13 @@ fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
     if !tests.is_empty() {
         let stdout = io::stdout();
         let mut handle = stdout.lock();
+        for test in tests {
+            if let Some(captured) = &test.stdout {
+                handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.name))?;
+                handle.write_all(captured)?;
+                handle.write_all(b"\n")?;
+            }
+        }
         handle.write_all(b"\nfailures:\n")?;
         for test in tests {
             handle.write_fmt(format_args!("\t{}", test.name))?;
@@ -131,7 +138,7 @@ enum TestResult {
     Passed,
     Failed(Option<String>),
     Ignored,
-    //Filtered,
+    // TODO: add Filtered
 }
 
 #[derive(serde::Serialize, Debug, PartialEq)]
@@ -140,8 +147,9 @@ pub(crate) struct CompletedTest {
     state: TestResult,
     uj: Option<u128>,
     us: Option<u128>,
+    #[serde(skip)]
+    stdout: Option<Vec<u8>>,
 }
-
 
 impl CompletedTest {
     fn empty(name: String) -> Self {
@@ -150,6 +158,7 @@ impl CompletedTest {
             state: TestResult::Ignored,
             uj: None,
             us: None,
+            stdout: None,
         }
     }
 }
@@ -166,7 +175,7 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         // Use internal compiler function `set_output_capture` to capture the output of the
         // tests.
         let data = Arc::new(Mutex::new(Vec::new()));
-        io::set_output_capture(Some(data));
+        io::set_output_capture(Some(data.clone()));
 
         let mut uj = 0;
         let mut us = 0;
@@ -195,12 +204,14 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         // Reset the output capturing to the default behavior and transform the captured output
         // to a vector of bytes.
         io::set_output_capture(None);
+        let stdout = Some(data.lock().unwrap_or_else(|e| e.into_inner()).to_vec());
 
         CompletedTest {
             name: test.desc.name.to_string(),
             state,
             uj: Some(uj),
             us: Some(us),
+            stdout,
         }
     }
 }
