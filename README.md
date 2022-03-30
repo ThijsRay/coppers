@@ -1,4 +1,5 @@
-![](/images/coppers-logo.svg)
+<img src="/images/coppers-logo.svg" width="50%" />
+
 # Coppers
 
 Coppers is a test harness for Rust that can measure the evolution of power consumptions of a Rust program between different versions with the help of [Intel RAPL](https://lwn.net/Articles/545745/).
