@@ -283,5 +283,6 @@ pub fn visualize() {
     Python::with_gil(|py| -> PyResult<()> {
         PyModule::from_code(py, PYTHON_CODE, "visualization.py", "visualization")?;
         Ok(())
-    }).unwrap();
+    })
+    .unwrap();
 }

@@ -24,7 +24,7 @@ use test::{StaticTestFn, TestDescAndFn};
 
 mod json;
 
-#[cfg(feature="visualization")]
+#[cfg(feature = "visualization")]
 mod visualization;
 
 pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 15;
@@ -73,7 +73,7 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
     print_failures(&failed_tests).unwrap();
 
     println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
-    
+
     // Write test results to JSON file
     write_to_json(passed_tests, total_us, total_uj, overhead_us, overhead_uj);
 

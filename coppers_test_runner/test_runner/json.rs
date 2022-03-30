@@ -57,7 +57,8 @@ pub(crate) fn write_to_json(
     let output_json = serde_json::to_string(&output).unwrap();
 
     create_dir_all("target/coppers_results").unwrap();
-    let json_file_name = format!("target/coppers_results/coppers_results-{execution_timestamp}.json");
+    let json_file_name =
+        format!("target/coppers_results/coppers_results-{execution_timestamp}.json");
     let mut file = File::create(json_file_name).unwrap();
     file.write_all(output_json.as_bytes()).unwrap()
 }
