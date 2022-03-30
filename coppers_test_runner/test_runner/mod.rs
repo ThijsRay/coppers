@@ -1,4 +1,4 @@
-// Copyright 2022 Thijs Raymakers
+// Copyright 2022 Thijs Raymakers, Jeffrey Bouman
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 // Note that this is heavily inspired by libtest that is part of the Rust language.
 
+use self::json::write_to_json;
 use coppers_sensors::{RAPLSensor, Sensor};
 use std::any::Any;
 use std::io::{self, Write};
@@ -21,7 +22,9 @@ use std::panic::catch_unwind;
 use std::sync::{Arc, Mutex};
 use test::{StaticTestFn, TestDescAndFn};
 
-const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
+mod json;
+
+pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
 
 pub fn runner(tests: &[&test::TestDescAndFn]) {
     let tests: Vec<_> = tests.iter().map(make_owned_test).collect();
@@ -50,7 +53,7 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
                 test_uj += result.uj.unwrap();
                 test_us += result.us.unwrap();
                 passed_tests.push(result);
-            },
+            }
             TestResult::Failed(_) => failed_tests.push(result),
             TestResult::Ignored => ignored += 1,
             //TestResult::Filtered => filtered += 1,
@@ -66,7 +69,9 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
 
     print_failures(&failed_tests).unwrap();
 
-    println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len())
+    println!("test result: {}.\n\t{} passed;\n\t{} failed;\n\t{ignored} ignored;\n\tfinished in {total_us} μs consuming {total_uj} μJ\n\tspend {test_us} μs and {test_uj} μJ on tests\n\tspend {overhead_us} μs and {overhead_uj} μJ on overhead", passed(failed_tests.is_empty()), passed_tests.len(), failed_tests.len());
+    // Write test results to JSON file
+    write_to_json(passed_tests, total_us, total_uj, overhead_us, overhead_uj)
 }
 
 fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
@@ -75,14 +80,14 @@ fn print_failures(tests: &Vec<CompletedTest>) -> std::io::Result<()> {
         let mut handle = stdout.lock();
         for test in tests {
             if let Some(captured) = &test.stdout {
-                handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.desc.name))?;
+                handle.write_fmt(format_args!("\n---- {} stdout ----\n", test.name))?;
                 handle.write_all(captured)?;
                 handle.write_all(b"\n")?;
             }
         }
         handle.write_all(b"\nfailures:\n")?;
         for test in tests {
-            handle.write_fmt(format_args!("\t{}", test.desc.name))?;
+            handle.write_fmt(format_args!("\t{}", test.name))?;
             if let TestResult::Failed(Some(msg)) = &test.state {
                 handle.write_fmt(format_args!(": {}\n", msg))?;
             }
@@ -99,12 +104,12 @@ fn print_test_result(test: &CompletedTest) {
             let us = test.us.unwrap();
             println!(
                 "test {} ... {} - [{uj} μJ in {us} μs]",
-                test.desc.name,
+                test.name,
                 passed(true)
             )
         }
         TestResult::Failed(_) => {
-            println!("test {} ... {}", test.desc.name, passed(false))
+            println!("test {} ... {}", test.name, passed(false))
         }
         _ => {}
     }
@@ -128,26 +133,28 @@ fn make_owned_test(test: &&TestDescAndFn) -> TestDescAndFn {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(serde::Serialize, Debug, PartialEq)]
 enum TestResult {
     Passed,
     Failed(Option<String>),
     Ignored,
-    //Filtered,
+    // TODO: add Filtered
 }
 
-struct CompletedTest {
-    desc: test::TestDesc,
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub(crate) struct CompletedTest {
+    name: String,
     state: TestResult,
     uj: Option<u128>,
     us: Option<u128>,
+    #[serde(skip)]
     stdout: Option<Vec<u8>>,
 }
 
 impl CompletedTest {
-    fn empty(desc: test::TestDesc) -> Self {
+    fn empty(name: String) -> Self {
         CompletedTest {
-            desc,
+            name,
             state: TestResult::Ignored,
             uj: None,
             us: None,
@@ -159,7 +166,7 @@ impl CompletedTest {
 fn run_test(test: test::TestDescAndFn) -> CompletedTest {
     // If a test is marked with #[ignore], it should not be executed
     if test.desc.ignore {
-        CompletedTest::empty(test.desc)
+        CompletedTest::empty(test.desc.name.to_string())
     } else {
         let mut sensor =
             RAPLSensor::new("/sys/devices/virtual/powercap/intel-rapl/intel-rapl:0".to_string())
@@ -200,7 +207,7 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         let stdout = Some(data.lock().unwrap_or_else(|e| e.into_inner()).to_vec());
 
         CompletedTest {
-            desc: test.desc,
+            name: test.desc.name.to_string(),
             state,
             uj: Some(uj),
             us: Some(us),
