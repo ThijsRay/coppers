@@ -18,7 +18,7 @@ use self::json::write_to_json;
 use coppers_sensors::{RAPLSensor, Sensor};
 use std::any::Any;
 use std::io::{self, Write};
-use std::panic::catch_unwind;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 use test::{StaticTestFn, TestDescAndFn};
 
@@ -192,8 +192,10 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
                 let mut state = TestResult::Ignored;
                 // Run the test function 100 times in a row
                 for _ in 0..REPEAT_TESTS_AMOUNT_OF_TIMES {
-                    sensor.start_measuring();
-                    let result = catch_unwind(f);
+                    let result = catch_unwind(AssertUnwindSafe(|| {
+                        sensor.start_measuring();
+                        f();
+                    }));
                     sensor.stop_measuring();
                     uj += sensor.get_measured_uj();
                     us += sensor.get_elapsed_time_us();
