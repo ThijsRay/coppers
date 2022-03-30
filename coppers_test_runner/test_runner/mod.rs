@@ -27,7 +27,7 @@ mod json;
 #[cfg(feature="visualization")]
 mod visualization;
 
-pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 1;
+pub(crate) const REPEAT_TESTS_AMOUNT_OF_TIMES: usize = 15;
 
 pub fn runner(tests: &[&test::TestDescAndFn]) {
     let tests: Vec<_> = tests.iter().map(make_owned_test).collect();
