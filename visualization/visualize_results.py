@@ -22,7 +22,7 @@ import plotly.express as px
 
 
 AMOUNT_OF_TESTS_IN_TOP = 3
-RESULT_PATH = "../results"
+RESULT_PATH = "../target/coppers_results/"
 
 
 def is_coppers_file(filename):
