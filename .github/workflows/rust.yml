@@ -29,6 +29,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
+        args: --lib
 
   clippy:
     runs-on: ubuntu-latest
