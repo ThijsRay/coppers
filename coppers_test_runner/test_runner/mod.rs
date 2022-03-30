@@ -199,7 +199,7 @@ fn run_test(test: test::TestDescAndFn) -> CompletedTest {
         // Use internal compiler function `set_output_capture` to capture the output of the
         // tests.
         let data = Arc::new(Mutex::new(Vec::new()));
-        io::set_output_capture(Some(data.clone()));
+        io::set_output_capture(Some(data));
 
         let mut uj = 0;
         let mut us = 0;
