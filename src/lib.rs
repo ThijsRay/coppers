@@ -22,8 +22,8 @@
 // information.
 extern crate test;
 
+mod sensors;
 mod test_runner;
-pub(crate) mod sensors;
 
 // Export the runner funcion so crates that depend on this crate can use it
 pub use crate::test_runner::runner;

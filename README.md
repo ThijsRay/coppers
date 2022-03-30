@@ -114,6 +114,9 @@ error. This can be solved in one of two ways:
     2. `cargo test`
     3. `sudo chmod o-r /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/energy_uj`
 
+### ModuleNotFoundError
+If you run with the [`visualization` feature](#visualization) enabled, then you also need to install the required Python packages. This can be done by installing the packages defined in this
+repositories [`requirements.txt`](/requirements.txt) with `pip install -r requirements.txt`.
 
 ## About
 This project was done in the context of the [2022 edition of Sustainable Software Engineering course at Delft University of Technology](https://luiscruz.github.io/course_sustainableSE/2022/). We chose the name "Coppers" because our project relates to both green software and Rust, and oxidized copper has a green-ish color.
