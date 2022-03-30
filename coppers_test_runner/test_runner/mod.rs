@@ -50,7 +50,7 @@ pub fn runner(tests: &[&test::TestDescAndFn]) {
                 test_uj += result.uj.unwrap();
                 test_us += result.us.unwrap();
                 passed_tests.push(result);
-            },
+            }
             TestResult::Failed(_) => failed_tests.push(result),
             TestResult::Ignored => ignored += 1,
             //TestResult::Filtered => filtered += 1,
