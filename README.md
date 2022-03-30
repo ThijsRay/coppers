@@ -92,10 +92,10 @@ For the most accurate, reliable and reproducible results, you could take certain
 
 ### Completeness
 This project is far from complete, but it is what we could achieve within the short timespan of [the course we are following](#about). It could be extended and improved with things like
-- [] Reporting the correct error code when a test fails
-- [] Run on more platforms beside Intel based Linux machiens
-- [] Shuffle the tests around during execution, to avoid that tests are more energy efficient because of a high cache hit rate
-- [] Make certain things more customizable, like the amount of times a test should be repeated or whether to ignore certain tests from the reporting
+- [ ] Reporting the correct error code when a test fails
+- [ ] Run on more platforms beside Intel based Linux machiens
+- [ ] Shuffle the tests around during execution, to avoid that tests are more energy efficient because of a high cache hit rate
+- [ ] Make certain things more customizable, like the amount of times a test should be repeated or whether to ignore certain tests from the reporting
 
 ## Troubleshooting
 
