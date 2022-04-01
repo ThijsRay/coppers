@@ -196,8 +196,8 @@ def comparison_to_last(data):
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                if result["execution_timestamp"] > last_execution_timestamp & result["execution_timestamp"] < data[
-                    "execution_timestamp"]:
+                if (result["execution_timestamp"] > last_execution_timestamp) and (result["execution_timestamp"] < data[
+                    "execution_timestamp"]):
                     last_execution_filename = filename
                     last_execution_timestamp = result["execution_timestamp"]
 
