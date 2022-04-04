@@ -135,7 +135,7 @@ def get_data():
 
 def visualize_all_tests(data, n):
     data = sorted(data, reverse=True, key=lambda item: item["uj"])
-    bars = [test["uj"] / n for test in reversed(data)]
+    bars = [round(test["uj"] / n) for test in reversed(data)]
     x = [test["name"] for test in reversed(data)]
     fig = px.bar(x=bars, y=x, labels={"x": "Energy consumption (\u03bcJ)", "y": "Test"})
     return plotly.io.to_html(fig)
@@ -174,7 +174,8 @@ def visualize_over_time():
     all_runs = all_runs.assign(sequential_index=sequential_index)
 
     fig = px.line(all_runs, x="sequential_index", y="uj", color="name", markers="name",
-                  labels={"sequential_index": "Commit", "\u03bcj": "Energy consumption (\u03bcJ)"})
+                  labels={"sequential_index": "Commit", "uj": "Energy consumption (\u03bcJ)"},
+                  hover_data={'uj':':.0f'})
 
     fig.update_layout(
         xaxis=dict(
@@ -195,15 +196,15 @@ def comparison_to_last(data):
         if is_coppers_file(filename):
             with open(f"{RESULT_PATH}/{filename}", "r") as f:
                 result = json.load(f)
-                if result["execution_timestamp"] > last_execution_timestamp & result["execution_timestamp"] < data[
-                    "execution_timestamp"]:
+                if (result["execution_timestamp"] > last_execution_timestamp) and (result["execution_timestamp"] < data[
+                    "execution_timestamp"]):
                     last_execution_filename = filename
                     last_execution_timestamp = result["execution_timestamp"]
 
 
     with open(f"{RESULT_PATH}/{last_execution_filename}", "r") as f:
         last_result = json.load(f)
-    change_overall = data["total_uj"] / n - last_result["total_uj"] / n
+    change_overall = round(data["total_uj"] / n - last_result["total_uj"] / n)
 
     comparison_data = []
     for test in data["tests"]:
@@ -218,14 +219,14 @@ def comparison_to_last(data):
 
             comparison_data.append([
                 test["name"],
-                test_before["uj"],
-                test["uj"],
-                test["uj"] - test_before["uj"],
-                (test["uj"] - test_before["uj"]) / test_before["uj"] * 100,
-                test_before["us"],
-                test["us"],
-                test["us"] - test_before["us"],
-                (test["us"] - test_before["us"]) / test_before["us"] * 100,
+                round(test_before["uj"]),
+                round(test["uj"]),
+                round(test["uj"] - test_before["uj"]),
+                round((test["uj"] - test_before["uj"]) / test_before["uj"] * 100, 1),
+                round(test_before["us"]),
+                round(test["us"]),
+                round(test["us"] - test_before["us"]),
+                round((test["us"] - test_before["us"]) / test_before["us"] * 100, 1),
 
             ])
 
@@ -250,9 +251,9 @@ def main():
     n = float(results["number_of_repeats"])
     jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
     jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    jinja['most_energy_consuming_usages'] = [sorted_tests[i]['uj'] / n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['most_energy_consuming_usages'] = [round(sorted_tests[i]['uj'] / n) for i in range(AMOUNT_OF_TESTS_IN_TOP)]
     jinja['least_energy_consuming_names'] = [sorted_tests[-(i + 1)]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
-    jinja['least_energy_consuming_usages'] = [sorted_tests[-(i + 1)]['uj'] / n for i in range(AMOUNT_OF_TESTS_IN_TOP)]
+    jinja['least_energy_consuming_usages'] = [round(sorted_tests[-(i + 1)]['uj'] / n) for i in range(AMOUNT_OF_TESTS_IN_TOP)]
 
     if amount_of_results > 1:
         jinja["compare_to_last"] = True
