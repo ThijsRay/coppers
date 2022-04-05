@@ -247,7 +247,7 @@ def main():
         jinja['over_time'] = True
         jinja['plot_energy_over_time'] = visualize_over_time()
 
-    sorted_tests = sorted(results["tests"], reverse=True, key=lambda item: item["uj"])
+    sorted_tests = sorted(get_data()["tests"], reverse=True, key=lambda item: item["uj"])
     n = float(results["number_of_repeats"])
     jinja['amount_top'] = AMOUNT_OF_TESTS_IN_TOP
     jinja['most_energy_consuming_names'] = [sorted_tests[i]['name'] for i in range(AMOUNT_OF_TESTS_IN_TOP)]
