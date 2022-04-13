@@ -85,7 +85,7 @@ For the most accurate, reliable and reproducible results, you could take certain
 * Turn of all notifications
 * Only the minimum amount of hardware necessary should be connected, so avoid USB devices, external displays etc. if possible.
 * Kill unnecessary services running in the background
-* Switch of your network if it is not needed
+* Switch off your network if it is not needed
     * If you do need internet, prefer a cable connection over wireless
 * Disable auto brightness and set your brightness level as low as possible
 * Repeating the tests multiple times
